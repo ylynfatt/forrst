@@ -85,3 +85,91 @@ function forrst_settings() {
 
   return system_settings_form($form);
 }
+
+/**
+ * Implementation of hook_block()
+ */
+function forrst_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[0]['info'] = t('Forrst');
+      return $blocks;
+    case 'view':
+      $forrst_username = variable_get('forrst_username', 'forrst');
+      $no_of_posts = variable_get('forrst_no_of_posts', '1');
+
+      $url = "https://forrst.com/api/v2/user/posts?username={$forrst_username}";
+      
+      $blocks['subject'] = t('My Recent Forrst Posts');
+      $blocks['content'] = _forrst_fetch_posts($url, $forrst_username);
+      return $blocks;
+  }
+}
+
+/**
+ * Retrieve posts from the Forrst API.
+ * 
+ * @param $url
+ * URL for Forrst shots
+ * @param $forrst_username
+ * Forrst username
+ * @return
+ * String containing Forrst posts.
+ */
+function _forrst_fetch_posts($url, $forrst_username) {
+  $http_result = drupal_http_request($url);
+  
+  if ($http_result->code == 200) {
+    // Prepare JSON content for use
+    $data = json_decode($http_result->data);
+		//echo "<pre>";
+		//print_r($data->resp->posts);
+		//echo "</pre>";
+    return theme('forrst', $data->resp->posts, $forrst_username);
+  }
+  else {
+    watchdog('forrst', t('Unable to retrieve your Forrst posts. The following HTTP Response Code was received from the Forrst API: %code'), array('%code' => $http_result->code), WATCHDOG_NOTICE);
+    return t('Unable to retrieve your Forrst posts.');
+  }
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function forrst_theme() {
+  return array(
+    'forrst' => array(
+      'arguments' => array('data' => NULL, 'forrst_username' => NULL),
+    ),
+  );
+}
+
+/**
+ * Theme function for displaying Forrst posts.
+ * 
+ * @param $data
+ * JSON object containing Forrst API data
+ * @param $forrst_username
+ * Forrst username
+ * @return
+ * Formatted string.
+ */
+function theme_forrst($data, $forrst_username) {
+  // Get Stylesheet
+  if (variable_get('forrst_include_css', 1)) {
+    drupal_add_css(drupal_get_path('module', 'forrst') . '/forrst.css');
+  }
+  
+  $output .= '<ol class="forrst-posts">';
+  // Format your posts
+  foreach ($data as $post) {
+    $output .= '<li class="post">';
+    $output .= l($post->{title}, $post->{post_url}, array('attributes' => array('class' => 'forrst-link')));
+    $output .= '</li>';
+  }
+  $output .= '</ol>';
+  $output .= '<div class="forrst-view-more">' . l(t('View more of my posts'), 'http://forrst.com/people/' . $forrst_username) . '</div>';
+  
+  return $output;
+}
+
