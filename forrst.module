@@ -98,7 +98,7 @@ function forrst_block($op = 'list', $delta = 0, $edit = array()) {
       $forrst_username = variable_get('forrst_username', 'forrst');
       $no_of_posts = variable_get('forrst_no_of_posts', '1');
 
-      $url = "https://forrst.com/api/v2/user/posts?username={$forrst_username}";
+      $url = "https://forrst.com/api/v2/user/posts?username={$forrst_username}&limit={$no_of_posts}&type=snap";
       
       $blocks['subject'] = t('My Recent Forrst Posts');
       $blocks['content'] = _forrst_fetch_posts($url, $forrst_username);
@@ -125,7 +125,12 @@ function _forrst_fetch_posts($url, $forrst_username) {
 		//echo "<pre>";
 		//print_r($data->resp->posts);
 		//echo "</pre>";
-    return theme('forrst', $data->resp->posts, $forrst_username);
+
+		if (empty($data->resp->posts)) {
+			return '<p>' . t('No posts to display at this time.') . '</p>';
+		} else {
+    	return theme('forrst', $data->resp->posts, $forrst_username);
+		}
   }
   else {
     watchdog('forrst', t('Unable to retrieve your Forrst posts. The following HTTP Response Code was received from the Forrst API: %code'), array('%code' => $http_result->code), WATCHDOG_NOTICE);
@@ -163,8 +168,13 @@ function theme_forrst($data, $forrst_username) {
   $output .= '<ol class="forrst-posts">';
   // Format your posts
   foreach ($data as $post) {
-    $output .= '<li class="post">';
-    $output .= l($post->{title}, $post->{post_url}, array('attributes' => array('class' => 'forrst-link')));
+    $output .= '<li class="snap-post">';
+		$output .= '<div class="img">';
+		$output .= l('<img src="' . $post->snaps->large_url . '" alt="' . $post->{title} . '" />', $post->{post_url}, array('html' => TRUE));
+		$output .= '</div>';
+		$output .= '<div class="post content">';
+    $output .= '<h3>' . l($post->{title}, $post->{post_url}, array('attributes' => array('class' => 'forrst-link'))) . '</h3>';
+		$output .= '</div>';
     $output .= '</li>';
   }
   $output .= '</ol>';
