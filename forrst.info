@@ -1,3 +1,6 @@
 name = "Forrst"
 description = "Display your latest Forrst posts on your Drupal website"
-core = 6.x
+core = 7.x
+
+files[] = forrst.module
+files[] = forrst.css

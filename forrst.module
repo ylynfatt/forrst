@@ -26,10 +26,15 @@ function forrst_help($path, $arg) {
 }
 
 /**
- * Implementation of hook_perm()
+ * Implementation of hook_permission()
  */
-function forrst_perm() {
-  return array('administer Forrst');
+function forrst_permission() {
+  return array(
+    'administer Forrst' => array(
+      'title' => t('Administer Forrst'),
+      'description' => t('Change display settings for Forrst'),
+    ),
+  );
 }
 
 /**
@@ -87,23 +92,37 @@ function forrst_settings() {
 }
 
 /**
- * Implementation of hook_block()
+ * Implementation of hook_block_info()
  */
-function forrst_block($op = 'list', $delta = 0, $edit = array()) {
-  switch ($op) {
-    case 'list':
-      $blocks[0]['info'] = t('Forrst');
-      return $blocks;
-    case 'view':
+function forrst_block_info() {
+  $blocks = array();
+
+  $blocks['forrst'] = array(
+    'info' => t('Forrst Posts'),
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implementation of hook_block_view()
+ */
+function forrst_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'forrst':
       $forrst_username = variable_get('forrst_username', 'forrst');
       $no_of_posts = variable_get('forrst_no_of_posts', '1');
 
       $url = "https://forrst.com/api/v2/user/posts?username={$forrst_username}&limit={$no_of_posts}&type=snap";
       
-      $blocks['subject'] = t('My Recent Forrst Posts');
-      $blocks['content'] = _forrst_fetch_posts($url, $forrst_username);
-      return $blocks;
+      $block['subject'] = t('My Recent Forrst Posts');
+      $block['content'] = _forrst_fetch_posts($url, $forrst_username);
+      break;
   }
+
+  return $block;
 }
 
 /**
@@ -122,18 +141,16 @@ function _forrst_fetch_posts($url, $forrst_username) {
   if ($http_result->code == 200) {
     // Prepare JSON content for use
     $data = json_decode($http_result->data);
-		//echo "<pre>";
-		//print_r($data->resp->posts);
-		//echo "</pre>";
 
-		if (empty($data->resp->posts)) {
-			return '<p>' . t('No posts to display at this time.') . '</p>';
-		} else {
-    	return theme('forrst', $data->resp->posts, $forrst_username);
-		}
+    if (empty($data->resp->posts)) {
+      return '<p>' . t('No posts to display at this time.') . '</p>';
+    }
+    else {
+      return theme('forrst', array('data' => $data->resp->posts, 'forrst_username' => $forrst_username));
+    }
   }
   else {
-    watchdog('forrst', t('Unable to retrieve your Forrst posts. The following HTTP Response Code was received from the Forrst API: %code'), array('%code' => $http_result->code), WATCHDOG_NOTICE);
+    watchdog('forrst', 'Unable to retrieve your Forrst posts. The following HTTP Response Code was received from the Forrst API: %code', array('%code' => $http_result->code), WATCHDOG_NOTICE);
     return t('Unable to retrieve your Forrst posts.');
   }
 }
@@ -144,7 +161,7 @@ function _forrst_fetch_posts($url, $forrst_username) {
 function forrst_theme() {
   return array(
     'forrst' => array(
-      'arguments' => array('data' => NULL, 'forrst_username' => NULL),
+      'variables' => array('data' => NULL, 'forrst_username' => NULL),
     ),
   );
 }
@@ -159,26 +176,28 @@ function forrst_theme() {
  * @return
  * Formatted string.
  */
-function theme_forrst($data, $forrst_username) {
+function theme_forrst($variables) {
   // Get Stylesheet
   if (variable_get('forrst_include_css', 1)) {
     drupal_add_css(drupal_get_path('module', 'forrst') . '/forrst.css');
   }
+
+  $output = '';
   
   $output .= '<ol class="forrst-posts">';
   // Format your posts
-  foreach ($data as $post) {
+  foreach ($variables['data'] as $post) {
     $output .= '<li class="snap-post">';
-		$output .= '<div class="img">';
-		$output .= l('<img src="' . $post->snaps->large_url . '" alt="' . $post->{title} . '" />', $post->{post_url}, array('html' => TRUE));
-		$output .= '</div>';
-		$output .= '<div class="post content">';
-    $output .= '<h3>' . l($post->{title}, $post->{post_url}, array('attributes' => array('class' => 'forrst-link'))) . '</h3>';
-		$output .= '</div>';
+    $output .= '<div class="img">';
+    $output .= l('<img src="' . $post->snaps->large_url . '" alt="' . $post->title . '" />', $post->post_url, array('html' => TRUE));
+    $output .= '</div>';
+    $output .= '<div class="post content">';
+    $output .= '<h3>' . l($post->title, $post->post_url, array('attributes' => array('class' => 'forrst-link'))) . '</h3>';
+    $output .= '</div>';
     $output .= '</li>';
   }
   $output .= '</ol>';
-  $output .= '<div class="forrst-view-more">' . l(t('View more of my posts'), 'http://forrst.com/people/' . $forrst_username) . '</div>';
+  $output .= '<div class="forrst-view-more">' . l(t('View more of my posts'), 'http://forrst.com/people/' . $variables['forrst_username']) . '</div>';
   
   return $output;
 }
